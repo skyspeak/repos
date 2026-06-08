@@ -1,0 +1,279 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Disruptor unified API (disruption heatmap + investment analysis)
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: analyses
+    description: Document analysis operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analyses]
+      summary: List all analyses
+      responses:
+        "200":
+          description: List of analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisSummary"
+    post:
+      operationId: createAnalysis
+      tags: [analyses]
+      summary: Create a new analysis from document text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "201":
+          description: Analysis created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "400":
+          description: Invalid input
+
+  /analyses/{id}:
+    get:
+      operationId: getAnalysis
+      tags: [analyses]
+      summary: Get a specific analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAnalysis
+      tags: [analyses]
+      summary: Delete an analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /analyses/stats:
+    get:
+      operationId: getAnalysisStats
+      tags: [analyses]
+      summary: Get stats about analyses
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    AnalysisInput:
+      type: object
+      required:
+        - documentText
+        - documentType
+      properties:
+        documentText:
+          type: string
+          description: The raw text of the earnings transcript, earnings presentation, or S1 filing
+        documentType:
+          type: string
+          enum: [earnings_transcript, earnings_presentation, s1_filing]
+        companyName:
+          type: ["string", "null"]
+          description: Optional company name override
+
+    ChecklistItem:
+      type: object
+      required:
+        - metric
+        - category
+        - whatItIs
+        - whatItMeans
+        - verdict
+        - verdictReason
+      properties:
+        metric:
+          type: string
+          description: Name of the metric or item
+        category:
+          type: string
+          description: Category such as Revenue, Profitability, Growth, Risk, etc.
+        whatItIs:
+          type: string
+          description: Plain English explanation of what this metric is
+        whatItMeans:
+          type: string
+          description: What this metric tells you about the company
+        verdict:
+          type: string
+          enum: [positive, negative, neutral, mixed]
+          description: Whether this is good or bad for the company
+        verdictReason:
+          type: string
+          description: Brief explanation of why the verdict is what it is
+        value:
+          type: ["string", "null"]
+          description: Current reported value, if available
+        yoyChange:
+          type: ["string", "null"]
+          description: Year-over-year change, if available
+        qoqChange:
+          type: ["string", "null"]
+          description: Quarter-over-quarter change, if available
+        flags:
+          type: ["string", "null"]
+          description: Any red flags or green flags to note
+
+    Analysis:
+      type: object
+      required:
+        - id
+        - companyName
+        - documentType
+        - checklist
+        - summary
+        - overallVerdict
+        - createdAt
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        documentType:
+          type: string
+          enum: [earnings_transcript, earnings_presentation, s1_filing]
+        checklist:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+        summary:
+          type: string
+          description: Overall plain-English summary for a beginner investor
+        overallVerdict:
+          type: string
+          enum: [positive, negative, neutral, mixed]
+        keyStrengths:
+          type: array
+          items:
+            type: string
+        keyRisks:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+
+    AnalysisSummary:
+      type: object
+      required:
+        - id
+        - companyName
+        - documentType
+        - overallVerdict
+        - createdAt
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        documentType:
+          type: string
+          enum: [earnings_transcript, earnings_presentation, s1_filing]
+        overallVerdict:
+          type: string
+          enum: [positive, negative, neutral, mixed]
+        summary:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    AnalysisStats:
+      type: object
+      required:
+        - totalAnalyses
+        - byDocumentType
+        - byVerdict
+      properties:
+        totalAnalyses:
+          type: integer
+        byDocumentType:
+          type: object
+          properties:
+            earnings_transcript:
+              type: integer
+            earnings_presentation:
+              type: integer
+            s1_filing:
+              type: integer
+          required:
+            - earnings_transcript
+            - earnings_presentation
+            - s1_filing
+        byVerdict:
+          type: object
+          properties:
+            positive:
+              type: integer
+            negative:
+              type: integer
+            neutral:
+              type: integer
+            mixed:
+              type: integer
+          required:
+            - positive
+            - negative
+            - neutral
+            - mixed

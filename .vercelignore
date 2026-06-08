@@ -1,0 +1,6 @@
+ai-disruption-heatmap
+investment-analyzer
+.cache
+.local
+*.md
+!README.md
