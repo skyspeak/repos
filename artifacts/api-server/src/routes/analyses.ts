@@ -10,9 +10,9 @@ import {
 } from "@workspace/api-zod";
 import { runAnalysis } from "../analyzer/run";
 import type { ChecklistItem } from "../analyzer/types";
+import { startOfRefreshDay } from "../lib/refresh";
 
 const router = Router();
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function requireDatabase(res: import("express").Response): boolean {
   if (isDatabaseConfigured()) return true;
@@ -85,7 +85,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
   }
   const { documentText, documentType, companyName } = parsed.data;
   const hash = documentHash(documentText, documentType);
-  const cutoff = new Date(Date.now() - ONE_DAY_MS);
+  const cutoff = startOfRefreshDay();
 
   try {
     const [cached] = await db

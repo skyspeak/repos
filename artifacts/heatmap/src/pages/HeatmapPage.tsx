@@ -19,7 +19,14 @@ export type SortKey =
   | 'marketSize'
   | 'cagr';
 
-const REPORT_DATE = 'May 2025';
+function formatReportDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+const REPORT_DATE = formatReportDate(
+  CATEGORIES.map(c => c.lastUpdated).sort().reverse()[0] ?? new Date().toISOString().slice(0, 10),
+);
 
 const VALID_SORT_KEYS: SortKey[] = [
   'composite',

@@ -92,4 +92,19 @@ GEMINI_API_KEY=AIza...              # investment pipeline
 DATABASE_URL=postgresql://...       # Neon pooled URL
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet   # optional
 GEMINI_MODEL=gemini-2.0-flash                  # optional
+CRON_SECRET=...                                 # Vercel daily cache cron
+```
+
+## Weekly category refresh
+
+Heatmap scores, theses, and signals live in `artifacts/heatmap/src/data/categories-data.json` and are regenerated weekly by a GitHub Action (Mondays 06:00 UTC).
+
+**GitHub secrets required:** `GEMINI_API_KEY` and/or `OPENROUTER_API_KEY`
+
+Manual run:
+
+```bash
+pnpm categories:regenerate              # all 42 categories (~3–5 min)
+pnpm categories:regenerate -- --limit=3 # smoke test
+pnpm categories:regenerate -- --id=predictive-maintenance
 ```

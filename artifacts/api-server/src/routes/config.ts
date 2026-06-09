@@ -5,6 +5,7 @@ import {
   getDeepDiveProvider,
   getInvestmentProvider,
 } from "../lib/llm-config";
+import { getRefreshDay } from "../lib/refresh";
 
 const router = Router();
 
@@ -37,7 +38,9 @@ router.get("/config", (_req, res) => {
       serverProxyEnabled: available.length > 0,
     },
     refresh: {
-      maxIntervalHours: 24,
+      cadence: "daily",
+      timezone: "UTC",
+      refreshDay: getRefreshDay(),
     },
   });
 });

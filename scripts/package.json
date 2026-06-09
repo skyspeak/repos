@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "export-categories": "tsx ./src/export-categories.ts",
+    "regenerate-categories": "tsx ./src/regenerate-categories.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "openai": "^6.27.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -1,3 +1,5 @@
+import { getRefreshDay, isCacheValidForToday } from './refresh';
+
 export interface LLMSettings {
   provider: 'openai' | 'anthropic' | 'openrouter' | 'gemini' | 'mistral' | 'nvidia' | 'ollama' | 'custom';
   apiKey: string;
@@ -13,7 +15,9 @@ export interface AppConfig {
     serverProxyEnabled: boolean;
   };
   refresh: {
-    maxIntervalHours: number;
+    cadence: 'daily';
+    timezone: 'UTC';
+    refreshDay: string;
   };
 }
 
@@ -72,7 +76,6 @@ export const DEFAULT_SETTINGS: LLMSettings = {
 const SETTINGS_KEY = 'heatmap-llm-settings';
 const CONFIG_KEY = 'disruptor-app-config';
 const DEEP_DIVE_CACHE_PREFIX = 'deep-dive-cache-';
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export function loadLLMSettings(): LLMSettings {
   try {
@@ -113,6 +116,7 @@ export async function fetchAppConfig(): Promise<AppConfig | null> {
 interface DeepDiveCacheEntry {
   output: string;
   cachedAt: number;
+  refreshDay?: string;
 }
 
 export function loadDeepDiveCache(cacheKey: string): DeepDiveCacheEntry | null {
@@ -120,7 +124,7 @@ export function loadDeepDiveCache(cacheKey: string): DeepDiveCacheEntry | null {
     const raw = localStorage.getItem(`${DEEP_DIVE_CACHE_PREFIX}${cacheKey}`);
     if (!raw) return null;
     const entry = JSON.parse(raw) as DeepDiveCacheEntry;
-    if (Date.now() - entry.cachedAt >= ONE_DAY_MS) {
+    if (!isCacheValidForToday(entry.cachedAt, entry.refreshDay)) {
       localStorage.removeItem(`${DEEP_DIVE_CACHE_PREFIX}${cacheKey}`);
       return null;
     }
@@ -131,7 +135,11 @@ export function loadDeepDiveCache(cacheKey: string): DeepDiveCacheEntry | null {
 }
 
 export function saveDeepDiveCache(cacheKey: string, output: string) {
-  const entry: DeepDiveCacheEntry = { output, cachedAt: Date.now() };
+  const entry: DeepDiveCacheEntry = {
+    output,
+    cachedAt: Date.now(),
+    refreshDay: getRefreshDay(),
+  };
   localStorage.setItem(`${DEEP_DIVE_CACHE_PREFIX}${cacheKey}`, JSON.stringify(entry));
 }
 

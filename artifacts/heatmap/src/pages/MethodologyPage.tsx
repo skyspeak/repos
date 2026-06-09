@@ -283,12 +283,16 @@ export default function MethodologyPage() {
           Update Cadence & Authoring
         </h2>
         <p className="text-sm text-muted-foreground mb-4">
-          AI capabilities and competitive landscapes shift faster than traditional industry research. The report is designed for quarterly updates with continuous signal monitoring between releases.
+          AI capabilities and competitive landscapes shift quickly. LLM-generated deep dives and investment analyses refresh daily; heatmap scores, theses, and signals are regenerated weekly via an automated pipeline.
         </p>
         <div className="rounded-lg border border-border bg-card p-4 space-y-3 text-xs text-muted-foreground leading-relaxed">
           <p>
-            <span className="font-semibold text-foreground">Quarterly major refresh.</span>{' '}
-            All scores, financials, and signals are re-evaluated each quarter. Categories with material changes get a refreshed thesis. The "As of <span className="font-mono">Month Year</span>" stamp on each detail panel reflects the most recent review.
+            <span className="font-semibold text-foreground">Weekly category refresh.</span>{' '}
+            All 42 heatmap categories — scores, thesis, and signals — are re-evaluated every Monday by an LLM batch job. Updates are committed to the repo and deployed automatically. The "As of <span className="font-mono">Month Year</span>" stamp on each detail panel reflects the most recent weekly run.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Daily LLM refresh.</span>{' '}
+            AI deep dives and document analyses reset at UTC midnight each day. Re-running the same analysis after that boundary triggers a fresh LLM pass.
           </p>
           <p>
             <span className="font-semibold text-foreground">Continuous signal capture.</span>{' '}

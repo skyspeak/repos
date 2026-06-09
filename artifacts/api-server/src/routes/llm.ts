@@ -1,16 +1,14 @@
 import { Router } from "express";
 import { getDeepDiveProvider, getLLMClient } from "../lib/llm-config";
+import {
+  getDeepDiveCache,
+  setDeepDiveCache,
+} from "../lib/deep-dive-cache";
 
 const router = Router();
 
 const SYSTEM_PROMPT =
   "You are an expert venture capital and technology analyst specializing in AI disruption across industries. Be specific, cite concrete examples, and provide actionable insights for investors and founders.";
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const deepDiveCache = new Map<
-  string,
-  { output: string; cachedAt: number }
->();
 
 router.post("/llm/deep-dive", async (req, res): Promise<void> => {
   const { prompt, cacheKey } = req.body as {
@@ -24,12 +22,13 @@ router.post("/llm/deep-dive", async (req, res): Promise<void> => {
   }
 
   if (cacheKey && typeof cacheKey === "string") {
-    const cached = deepDiveCache.get(cacheKey);
-    if (cached && Date.now() - cached.cachedAt < ONE_DAY_MS) {
+    const cached = getDeepDiveCache(cacheKey);
+    if (cached) {
       res.json({
         output: cached.output,
         cached: true,
         cachedAt: new Date(cached.cachedAt).toISOString(),
+        refreshDay: cached.refreshDay,
       });
       return;
     }
@@ -77,10 +76,7 @@ router.post("/llm/deep-dive", async (req, res): Promise<void> => {
     res.end();
 
     if (cacheKey && typeof cacheKey === "string" && fullOutput) {
-      deepDiveCache.set(cacheKey, {
-        output: fullOutput,
-        cachedAt: Date.now(),
-      });
+      setDeepDiveCache(cacheKey, fullOutput);
     }
   } catch (err) {
     req.log.error({ err }, "Deep-dive stream failed");

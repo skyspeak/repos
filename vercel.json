@@ -4,6 +4,12 @@
   "buildCommand": "node scripts/build-vercel.mjs",
   "outputDirectory": "artifacts/heatmap/dist/public",
   "framework": null,
+  "crons": [
+    {
+      "path": "/api/cron/daily-refresh",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "functions": {
     "api/index.js": {
       "maxDuration": 60

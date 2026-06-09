@@ -73,7 +73,7 @@ export default function LLMDrawer({ category, onOpenSettings }: Props) {
     const cached = loadDeepDiveCache(cacheKey);
     if (cached) {
       setOutput(cached.output);
-      setCacheInfo(`Cached analysis from ${new Date(cached.cachedAt).toLocaleString()}. Refreshes once per day.`);
+      setCacheInfo(`Cached analysis from ${new Date(cached.cachedAt).toLocaleString()}. Refreshes daily at UTC midnight.`);
     }
   }, [category.id, cacheKey]);
 
@@ -91,7 +91,7 @@ export default function LLMDrawer({ category, onOpenSettings }: Props) {
 
   function startStream(force = false) {
     if (!force && !canRefreshDeepDive(cacheKey) && output) {
-      setError('This category was analyzed within the last 24 hours. Use Regenerate to force a new analysis.');
+      setError('This category was already analyzed today. Use Regenerate to force a new analysis.');
       return;
     }
 
@@ -119,7 +119,7 @@ export default function LLMDrawer({ category, onOpenSettings }: Props) {
         if (myRequestId !== requestIdRef.current) return;
         setStreaming(false);
         if (accum) {
-          setCacheInfo('Analysis cached for 24 hours.');
+          setCacheInfo('Analysis cached until UTC midnight.');
         }
       },
       (e) => {
@@ -159,7 +159,7 @@ export default function LLMDrawer({ category, onOpenSettings }: Props) {
         Streams a structured analysis covering <span className="text-foreground font-medium">supply-chain leverage</span>,{' '}
         <span className="text-foreground font-medium">product architecture</span>,{' '}
         <span className="text-foreground font-medium">GTM wedge</span>, and{' '}
-        <span className="text-foreground font-medium">competitive moat</span>. Results refresh at most once per day.
+        <span className="text-foreground font-medium">competitive moat</span>. Results refresh daily at UTC midnight.
       </p>
 
       {cacheInfo && (
