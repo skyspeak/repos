@@ -24,7 +24,7 @@ Or create a repo on GitHub manually, then `git remote add origin <url> && git pu
 
 1. Go to **[vercel.com/new](https://vercel.com/new)**
 2. Import your GitHub repo
-3. Leave all settings as default — `vercel.json` handles the build
+3. Set **Root Directory** to the repo root (leave empty) **or** `artifacts/api-server` — both are supported via `vercel.json`
 4. Add these **Environment Variables** before deploying:
 
 | Variable | Required for | Where to get it |

@@ -33,6 +33,7 @@ node_modules
 
 # Vercel build output (generated api bundle)
 /api
+artifacts/api-server/api
 
 # Original source folders (merged into app — not needed in deploy)
 ai-disruption-heatmap/

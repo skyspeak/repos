@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import { rm, mkdir } from "node:fs/promises";
+import { rm, mkdir, cp } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -12,16 +12,24 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const heatmapDir = path.join(rootDir, "artifacts/heatmap");
 
 async function buildApi() {
-  const apiDir = path.join(rootDir, "api");
-  await rm(apiDir, { recursive: true, force: true });
-  await mkdir(apiDir, { recursive: true });
+  const apiDirs = [
+    path.join(rootDir, "api"),
+    path.join(rootDir, "artifacts/api-server/api"),
+  ];
+
+  for (const apiDir of apiDirs) {
+    await rm(apiDir, { recursive: true, force: true });
+    await mkdir(apiDir, { recursive: true });
+  }
+
+  const outfile = path.join(apiDirs[0], "index.js");
 
   await esbuild({
     entryPoints: [path.join(rootDir, "artifacts/api-server/src/vercel.ts")],
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: path.join(apiDir, "index.js"),
+    outfile,
     logLevel: "info",
     external: ["pg-native"],
     banner: {
@@ -31,7 +39,8 @@ globalThis.require = __req;`,
     },
   });
 
-  console.log("✓ API bundled to api/index.js");
+  await cp(outfile, path.join(apiDirs[1], "index.js"));
+  console.log("✓ API bundled to api/index.js (+ artifacts/api-server/api for Vercel root dir)");
 }
 
 function findVite() {
