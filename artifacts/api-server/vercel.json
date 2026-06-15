@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd \"$(git rev-parse --show-toplevel)\" && corepack enable && pnpm install",
-  "buildCommand": "node \"$(git rev-parse --show-toplevel)/scripts/build-vercel.mjs\"",
+  "installCommand": "corepack enable && pnpm --dir ../.. install",
+  "buildCommand": "node vercel-build.mjs",
   "outputDirectory": "../heatmap/dist/public",
   "framework": null,
   "functions": {
