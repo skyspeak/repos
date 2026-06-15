@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import { rm, mkdir, cp } from "node:fs/promises";
+import { rm, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -16,25 +16,23 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "../..");
 const heatmapDir = path.join(rootDir, "artifacts/heatmap");
 
+const apiBundles = [
+  path.join(rootDir, "api/bundle.js"),
+  path.join(here, "api/bundle.js"),
+];
+
 async function buildApi() {
-  const apiDirs = [
-    path.join(rootDir, "api"),
-    path.join(here, "api"),
-  ];
-
-  for (const apiDir of apiDirs) {
-    await rm(apiDir, { recursive: true, force: true });
-    await mkdir(apiDir, { recursive: true });
+  for (const outfile of apiBundles) {
+    await rm(outfile, { force: true });
+    await mkdir(path.dirname(outfile), { recursive: true });
   }
-
-  const outfile = path.join(apiDirs[0], "index.js");
 
   await esbuild({
     entryPoints: [path.join(here, "src/vercel.ts")],
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile,
+    outfile: apiBundles[0],
     logLevel: "info",
     external: ["pg-native"],
     banner: {
@@ -44,8 +42,9 @@ globalThis.require = __req;`,
     },
   });
 
-  await cp(outfile, path.join(apiDirs[1], "index.js"));
-  console.log("✓ API bundled to api/index.js");
+  const { copyFile } = await import("node:fs/promises");
+  await copyFile(apiBundles[0], apiBundles[1]);
+  console.log("✓ API bundled to api/bundle.js");
 }
 
 function findVite() {

@@ -31,9 +31,9 @@ node_modules
 .env
 .env.local
 
-# Vercel build output (generated api bundle)
-/api
-artifacts/api-server/api
+# Vercel build output (generated API bundles — index.js wrappers are committed)
+api/bundle.js
+artifacts/api-server/api/bundle.js
 
 # Original source folders (merged into app — not needed in deploy)
 ai-disruption-heatmap/
