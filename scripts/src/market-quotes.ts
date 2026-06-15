@@ -1,8 +1,10 @@
 /**
- * Free market quotes for weekly category refresh (Yahoo Finance + SEC ticker index).
+ * Free market quotes for weekly category refresh (Yahoo Finance spark/chart + SEC tickers).
  */
 
 const TICKERS_URL = "https://www.sec.gov/files/company_tickers.json";
+const USER_AGENT =
+  "Mozilla/5.0 (compatible; Disruptor/1.0; +https://github.com/skyspeak/repos)";
 const MIN_SEC_GAP_MS = 120;
 let lastSecAt = 0;
 let tickersCache: Map<string, { cik: string; title: string }> | null = null;
@@ -72,50 +74,68 @@ export interface StockQuote {
   marketCap: number | null;
 }
 
+interface SparkMeta {
+  symbol?: string;
+  regularMarketPrice?: number;
+  chartPreviousClose?: number;
+}
+
+function metaToQuote(meta: SparkMeta): StockQuote | null {
+  if (!meta.symbol || meta.regularMarketPrice == null) return null;
+  const prev = meta.chartPreviousClose ?? meta.regularMarketPrice;
+  const changePercent =
+    prev > 0 ? ((meta.regularMarketPrice - prev) / prev) * 100 : 0;
+  return {
+    symbol: meta.symbol,
+    price: meta.regularMarketPrice,
+    changePercent,
+    marketCap: null,
+  };
+}
+
 export async function fetchYahooQuotes(
   symbols: string[],
 ): Promise<Map<string, StockQuote>> {
   const unique = [...new Set(symbols.map((s) => s.toUpperCase()).filter(Boolean))];
   if (!unique.length) return new Map();
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${unique.join(",")}`;
-  const resp = await fetch(url, {
-    headers: { "User-Agent": "Disruptor/1.0 (weekly refresh)" },
-  });
-  if (!resp.ok) throw new Error(`Yahoo quote ${resp.status}`);
-  const data = (await resp.json()) as {
-    quoteResponse?: {
-      result?: Array<{
-        symbol?: string;
-        regularMarketPrice?: number;
-        regularMarketChangePercent?: number;
-        marketCap?: number;
-      }>;
-    };
-  };
+
   const out = new Map<string, StockQuote>();
-  for (const row of data.quoteResponse?.result ?? []) {
-    if (!row.symbol || row.regularMarketPrice == null) continue;
-    out.set(row.symbol, {
-      symbol: row.symbol,
-      price: row.regularMarketPrice,
-      changePercent: row.regularMarketChangePercent ?? 0,
-      marketCap: row.marketCap ?? null,
-    });
+
+  if (unique.length > 1) {
+    const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${unique.join(",")}&range=1d&interval=1d`;
+    const resp = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    if (resp.ok) {
+      const data = (await resp.json()) as {
+        spark?: {
+          result?: Array<{ response?: Array<{ meta?: SparkMeta }> }>;
+        };
+      };
+      for (const row of data.spark?.result ?? []) {
+        const q = metaToQuote(row.response?.[0]?.meta ?? {});
+        if (q) out.set(q.symbol, q);
+      }
+    }
   }
+
+  for (const symbol of unique) {
+    if (out.has(symbol)) continue;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+    const resp = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    if (!resp.ok) continue;
+    const data = (await resp.json()) as {
+      chart?: { result?: Array<{ meta?: SparkMeta }> };
+    };
+    const q = metaToQuote(data.chart?.result?.[0]?.meta ?? {});
+    if (q) out.set(symbol, q);
+    await new Promise((r) => setTimeout(r, 80));
+  }
+
   return out;
 }
 
-function formatCap(n: number): string {
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
-  return `$${n.toFixed(0)}`;
-}
-
 export function formatVendorValuation(q: StockQuote): string {
-  const cap = q.marketCap != null ? formatCap(q.marketCap) : `$${q.price.toFixed(2)}`;
   const sign = q.changePercent >= 0 ? "+" : "";
-  return `${cap} · $${q.price.toFixed(2)} (${sign}${q.changePercent.toFixed(1)}%)`;
+  return `$${q.price.toFixed(2)} (${sign}${q.changePercent.toFixed(1)}%)`;
 }
 
 type Vendor = { name: string; marketCapOrValuation: string; ticker?: string };
@@ -140,7 +160,6 @@ export async function refreshVendorQuotes(vendors: Vendor[]): Promise<void> {
   }
 }
 
-/** Parse "PTC ($18B)" from publicComps strings */
 export async function refreshPublicComps(comps: string[]): Promise<string[]> {
   const index = await loadTickerIndex();
   const tickers: string[] = [];
@@ -159,14 +178,12 @@ export async function refreshPublicComps(comps: string[]): Promise<string[]> {
 
   if (!tickers.length) return comps;
   const quotes = await fetchYahooQuotes(tickers);
-  let ti = 0;
   return comps.map((comp, i) => {
     const t = compTicker[i];
     if (!t) return comp;
     const q = quotes.get(t);
     if (!q) return comp;
-    ti++;
-    const cap = q.marketCap != null ? formatCap(q.marketCap) : `$${q.price.toFixed(0)}`;
-    return `${t} (${cap})`;
+    const sign = q.changePercent >= 0 ? "+" : "";
+    return `${t} ($${q.price.toFixed(2)}, ${sign}${q.changePercent.toFixed(1)}%)`;
   });
 }
