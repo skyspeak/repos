@@ -11,6 +11,10 @@ import {
 import { runAnalysis } from "../analyzer/run";
 import type { ChecklistItem } from "../analyzer/types";
 import { startOfRefreshDay } from "../lib/refresh";
+import {
+  fetchLatestFiling,
+  mapFormToDocumentType,
+} from "../integrations/sec/edgar";
 
 const router = Router();
 
@@ -72,6 +76,84 @@ router.get("/analyses", async (req, res): Promise<void> => {
   } catch (err) {
     req.log.error({ err }, "Failed to list analyses");
     res.status(500).json({ error: "Failed to list analyses" });
+  }
+});
+
+// POST /api/analyses/from-edgar — fetch SEC filing (free EDGAR) then analyze
+router.post("/analyses/from-edgar", async (req, res): Promise<void> => {
+  if (!requireDatabase(res)) return;
+  const { ticker, form } = req.body as { ticker?: string; form?: string };
+  if (!ticker || typeof ticker !== "string") {
+    res.status(400).json({ error: "ticker is required" });
+    return;
+  }
+
+  const formPrefix = form && typeof form === "string" ? form : "S-1";
+
+  try {
+    const { company, filing, text } = await fetchLatestFiling(
+      ticker,
+      formPrefix,
+    );
+    const documentType = mapFormToDocumentType(filing.form);
+    const hash = documentHash(text, `${documentType}:${filing.accessionNumber}`);
+    const cutoff = startOfRefreshDay();
+
+    const [cached] = await db
+      .select()
+      .from(analysesTable)
+      .where(
+        and(
+          eq(analysesTable.documentHash, hash),
+          gte(analysesTable.createdAt, cutoff),
+        ),
+      )
+      .limit(1);
+
+    if (cached) {
+      req.log.info({ ticker, cachedId: cached.id }, "Returning cached EDGAR analysis");
+      res.status(200).json({
+        ...cached,
+        createdAt: cached.createdAt.toISOString(),
+        cached: true,
+        source: { edgar: filing },
+      });
+      return;
+    }
+
+    req.log.info(
+      { ticker, form: filing.form, textLength: text.length },
+      "Analyzing SEC filing from EDGAR",
+    );
+    const result = await runAnalysis(
+      text,
+      documentType,
+      company.name ?? company.ticker,
+    );
+
+    const [inserted] = await db
+      .insert(analysesTable)
+      .values({
+        companyName: result.companyName,
+        documentType,
+        documentHash: hash,
+        checklist: result.checklist,
+        summary: result.summary,
+        overallVerdict: result.overallVerdict,
+        keyStrengths: result.keyStrengths,
+        keyRisks: result.keyRisks,
+      })
+      .returning();
+
+    res.status(201).json({
+      ...inserted,
+      createdAt: inserted.createdAt.toISOString(),
+      source: { edgar: filing },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "EDGAR analysis failed";
+    req.log.error({ err, ticker }, "Failed to analyze from EDGAR");
+    res.status(400).json({ error: message });
   }
 });
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import OpenAI from "openai";
 import { computeComposite } from "./composite";
+import { fetchCategoryNews, newsToSignalContext } from "./free-news";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dataPath = path.join(
@@ -86,7 +87,11 @@ function getModel(client: OpenAI): string {
   return process.env.OPENROUTER_MODEL ?? "anthropic/claude-3.5-sonnet";
 }
 
-function buildPrompt(category: CategoryRecord, asOf: string): string {
+function buildPrompt(
+  category: CategoryRecord,
+  asOf: string,
+  newsContext: string,
+): string {
   return `You are an expert venture analyst updating an AI disruption heatmap category.
 
 Category: ${category.name} (${category.id})
@@ -111,7 +116,10 @@ Current thesis: ${category.thesis}
 Recent signals:
 ${category.signals.map((s) => `- [${s.date}] ${s.type}: ${s.description}`).join("\n")}
 
-Task: Refresh this category for the week of ${asOf}. Research recent AI/product/funding/M&A/leadership developments in this space. Update scores modestly (typically ±0.3–1.0 unless a major event warrants more). Rewrite the thesis in 2–4 sentences with specific company names and numbers. Provide 2–4 signals from the last 90 days with real source URLs where possible.
+Recent headlines (Google News RSS, free — use these for signals with real URLs):
+${newsContext}
+
+Task: Refresh this category for the week of ${asOf}. Use the RSS headlines above where relevant. Update scores modestly (typically ±0.3–1.0 unless a major event warrants more). Rewrite the thesis in 2–4 sentences with specific company names and numbers. Provide 2–4 signals from the last 90 days with real source URLs from the headlines when possible.
 
 Return ONLY valid JSON matching this schema:
 {
@@ -137,6 +145,7 @@ async function refreshCategory(
   model: string,
   category: CategoryRecord,
   asOf: string,
+  newsContext: string,
 ): Promise<z.infer<typeof RefreshSchema>> {
   const response = await client.chat.completions.create({
     model,
@@ -146,9 +155,9 @@ async function refreshCategory(
       {
         role: "system",
         content:
-          "You produce precise JSON for an AI industry disruption database. Be specific with company names, dates, and dollar amounts.",
+          "You produce precise JSON for an AI industry disruption database. Be specific with company names, dates, and dollar amounts. Prefer source URLs from the provided RSS headlines.",
       },
-      { role: "user", content: buildPrompt(category, asOf) },
+      { role: "user", content: buildPrompt(category, asOf, newsContext) },
     ],
   });
 
@@ -211,7 +220,20 @@ async function main() {
   for (const target of targets) {
     process.stdout.write(`  ${target.id}… `);
     try {
-      const refresh = await refreshCategory(client, model, target, asOf);
+      const companies = [
+        ...target.incumbents.map((i) => i.name),
+        ...target.challengers.map((c) => c.name),
+      ];
+      const news = await fetchCategoryNews(target.name, companies);
+      const newsContext = newsToSignalContext(news);
+
+      const refresh = await refreshCategory(
+        client,
+        model,
+        target,
+        asOf,
+        newsContext,
+      );
       const composite = computeComposite(
         refresh.scores,
         refresh.startupOpportunity,

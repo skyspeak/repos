@@ -35,6 +35,7 @@ Or create a repo on GitHub manually, then `git remote add origin <url> && git pu
 | `OPENROUTER_API_KEY` | AI deep dives | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | `GEMINI_API_KEY` | S-1 / earnings analysis | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (free) |
 | `DATABASE_URL` | Investment history | [neon.tech](https://neon.tech) free Postgres (use the **pooled** connection string) |
+| `SEC_CONTACT_EMAIL` | SEC EDGAR fetch | Your email (SEC requires it in the User-Agent) |
 
 5. Click **Deploy**
 
@@ -100,7 +101,7 @@ CRON_SECRET=...                                 # Vercel daily cache cron
 
 ## Weekly category refresh
 
-Heatmap scores, theses, and signals live in `artifacts/heatmap/src/data/categories-data.json` and are regenerated weekly by a GitHub Action (Mondays 06:00 UTC).
+Heatmap scores, theses, and signals live in `artifacts/heatmap/src/data/categories-data.json` and are regenerated weekly by a GitHub Action (Mondays 06:00 UTC). Each run pulls **free Google News RSS** headlines before the LLM refresh.
 
 **GitHub secrets required:** `GEMINI_API_KEY` and/or `OPENROUTER_API_KEY`
 

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
-import { FileText, TrendingUp, AlertTriangle, Building, Presentation, FileBox } from "lucide-react";
+import { FileText, TrendingUp, AlertTriangle, Building, Presentation, FileBox, Download } from "lucide-react";
 
 import { 
   useCreateAnalysis, 
@@ -44,6 +45,9 @@ export default function Home() {
   const queryClient = useQueryClient();
   const createAnalysis = useCreateAnalysis();
   const { data: stats } = useGetAnalysisStats();
+  const [edgarTicker, setEdgarTicker] = useState("");
+  const [edgarForm, setEdgarForm] = useState("S-1");
+  const [edgarLoading, setEdgarLoading] = useState(false);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -86,6 +90,40 @@ export default function Home() {
     });
   };
 
+  async function analyzeFromEdgar() {
+    const ticker = edgarTicker.trim().toUpperCase();
+    if (!ticker) {
+      toast({ title: "Enter a ticker", variant: "destructive" });
+      return;
+    }
+    setEdgarLoading(true);
+    try {
+      const resp = await fetch("/api/analyses/from-edgar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, form: edgarForm }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error ?? `Request failed (${resp.status})`);
+      }
+      queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+      toast({
+        title: data.cached ? "Returned cached EDGAR analysis" : "SEC filing analyzed!",
+        description: data.cached ? undefined : `Fetched ${edgarForm} from EDGAR for ${ticker}`,
+      });
+      setLocation(`/investment/analysis/${data.id}`);
+    } catch (err) {
+      toast({
+        title: "EDGAR fetch failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setEdgarLoading(false);
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
@@ -94,9 +132,58 @@ export default function Home() {
           Understand companies in plain English
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Paste dense financial documents. Get a structured, beginner-friendly analysis breaking down the strengths, risks, and what it all means.
+          Paste financial documents or fetch SEC filings by ticker. Get a structured, beginner-friendly analysis.
         </p>
       </section>
+
+      <Card className="max-w-4xl mx-auto border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Download className="w-5 h-5 text-primary" />
+            Fetch from SEC EDGAR (free)
+          </CardTitle>
+          <CardDescription>
+            Pulls the latest filing from the SEC&apos;s public database — no paste required. S-1 for IPOs, 10-K for annual reports.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              placeholder="Ticker (e.g. ABNB, RIVN)"
+              value={edgarTicker}
+              onChange={(e) => setEdgarTicker(e.target.value.toUpperCase())}
+              className="sm:max-w-[140px] font-mono uppercase"
+              data-testid="input-edgar-ticker"
+            />
+            <Select value={edgarForm} onValueChange={setEdgarForm}>
+              <SelectTrigger className="sm:max-w-[160px]" data-testid="select-edgar-form">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="S-1">S-1 (IPO)</SelectItem>
+                <SelectItem value="10-K">10-K (Annual)</SelectItem>
+                <SelectItem value="10-Q">10-Q (Quarterly)</SelectItem>
+                <SelectItem value="8-K">8-K (Current)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={analyzeFromEdgar}
+              disabled={edgarLoading}
+              className="sm:flex-1"
+              data-testid="button-edgar-analyze"
+            >
+              {edgarLoading ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  Fetching from EDGAR & analyzing…
+                </>
+              ) : (
+                "Fetch & Analyze"
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {stats && stats.totalAnalyses > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
