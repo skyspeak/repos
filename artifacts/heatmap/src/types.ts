@@ -16,6 +16,7 @@ export interface Vendor {
   name: string;
   url: string;
   marketCapOrValuation: string;
+  ticker?: string;
   keyProduct?: string;
   vulnerability?: string;
 }

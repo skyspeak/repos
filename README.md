@@ -101,7 +101,7 @@ CRON_SECRET=...                                 # Vercel daily cache cron
 
 ## Weekly category refresh
 
-Heatmap scores, theses, and signals live in `artifacts/heatmap/src/data/categories-data.json` and are regenerated weekly by a GitHub Action (Mondays 06:00 UTC). Each run pulls **free Google News RSS** headlines before the LLM refresh.
+Heatmap scores, theses, and signals live in `artifacts/heatmap/src/data/categories-data.json` and are regenerated weekly by a GitHub Action (Mondays 06:00 UTC). Each run pulls **Google News RSS** headlines and **Yahoo Finance** quotes (free) for public company valuations before the LLM refresh.
 
 **GitHub secrets required:** `GEMINI_API_KEY` and/or `OPENROUTER_API_KEY`
 

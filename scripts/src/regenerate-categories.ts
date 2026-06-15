@@ -5,6 +5,10 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { computeComposite } from "./composite";
 import { fetchCategoryNews, newsToSignalContext } from "./free-news";
+import {
+  refreshPublicComps,
+  refreshVendorQuotes,
+} from "./market-quotes";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dataPath = path.join(
@@ -44,8 +48,9 @@ type CategoryRecord = {
   composite: number;
   thesis: string;
   signals: z.infer<typeof SignalSchema>[];
-  incumbents: { name: string }[];
-  challengers: { name: string }[];
+  incumbents: Array<{ name: string; marketCapOrValuation?: string; ticker?: string }>;
+  challengers: Array<{ name: string; marketCapOrValuation?: string; ticker?: string }>;
+  publicComps?: string[];
   lastUpdated: string;
   [key: string]: unknown;
 };
@@ -224,6 +229,24 @@ async function main() {
         ...target.incumbents.map((i) => i.name),
         ...target.challengers.map((c) => c.name),
       ];
+      await refreshVendorQuotes(
+        target.incumbents as Array<{
+          name: string;
+          marketCapOrValuation: string;
+          ticker?: string;
+        }>,
+      );
+      await refreshVendorQuotes(
+        target.challengers as Array<{
+          name: string;
+          marketCapOrValuation: string;
+          ticker?: string;
+        }>,
+      );
+      if (target.publicComps?.length) {
+        target.publicComps = await refreshPublicComps(target.publicComps);
+      }
+
       const news = await fetchCategoryNews(target.name, companies);
       const newsContext = newsToSignalContext(news);
 

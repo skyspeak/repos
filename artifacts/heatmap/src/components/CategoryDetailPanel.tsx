@@ -9,6 +9,28 @@ import SupplyChainViz from './SupplyChainViz';
 import LLMDrawer from './LLMDrawer';
 import { useState, useEffect } from 'react';
 import LLMSettingsModal from './LLMSettingsModal';
+import { useMarketQuotes, formatLiveQuote } from '@/hooks/use-market-quotes';
+import type { Vendor } from '@/types';
+
+function VendorValuation({
+  vendor,
+  quote,
+}: {
+  vendor: Vendor;
+  quote?: ReturnType<typeof useMarketQuotes>['quotes'][string];
+}) {
+  if (quote) {
+    return (
+      <div className="text-right shrink-0 max-w-[55%]">
+        <div className="text-xs font-mono text-foreground leading-tight">{formatLiveQuote(quote)}</div>
+        <div className="text-[10px] text-muted-foreground">Yahoo Finance · {quote.ticker}</div>
+      </div>
+    );
+  }
+  return (
+    <span className="text-xs text-muted-foreground font-mono shrink-0">{vendor.marketCapOrValuation}</span>
+  );
+}
 
 interface Props {
   category: Category | null;
@@ -73,6 +95,10 @@ export default function CategoryDetailPanel({ category, onClose }: Props) {
   const [llmSettingsOpen, setLlmSettingsOpen] = useState(false);
   const bucket = category ? BUCKETS.find(b => b.id === category.bucket) : undefined;
   const color = bucket?.color ?? '#3b82f6';
+  const allVendors = category
+    ? [...category.incumbents, ...category.challengers]
+    : undefined;
+  const { quotes: liveQuotes } = useMarketQuotes(allVendors);
 
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)').matches : false,
@@ -330,7 +356,7 @@ export default function CategoryDetailPanel({ category, onClose }: Props) {
                             {v.name}
                             <ExternalLink className="w-3 h-3 opacity-50" />
                           </a>
-                          <span className="text-xs text-muted-foreground font-mono">{v.marketCapOrValuation}</span>
+                          <VendorValuation vendor={v} quote={liveQuotes[v.name]} />
                         </div>
                         {v.keyProduct && (
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground/80 mb-0.5">
@@ -356,7 +382,7 @@ export default function CategoryDetailPanel({ category, onClose }: Props) {
                             {v.name}
                             <ExternalLink className="w-3 h-3 opacity-50" />
                           </a>
-                          <span className="text-xs text-muted-foreground font-mono">{v.marketCapOrValuation}</span>
+                          <VendorValuation vendor={v} quote={liveQuotes[v.name]} />
                         </div>
                         {v.keyProduct && (
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground/80">
