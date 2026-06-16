@@ -33,6 +33,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Spinner } from "@/components/ui/spinner";
 
+async function readApiError(resp: Response): Promise<string> {
+  const text = await resp.text();
+  try {
+    const data = JSON.parse(text) as { error?: string };
+    return data.error ?? text.slice(0, 200);
+  } catch {
+    if (text.startsWith("A server error")) {
+      return "Server crashed — check Vercel logs. Common fixes: set DATABASE_URL, GEMINI_API_KEY, and SEC_CONTACT_EMAIL.";
+    }
+    return text.slice(0, 200) || `Request failed (${resp.status})`;
+  }
+}
+
 type FormValues = {
   documentType: "earnings_transcript" | "earnings_presentation" | "s1_filing";
   companyName?: string;
@@ -103,10 +116,10 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticker, form: edgarForm }),
       });
-      const data = await resp.json();
       if (!resp.ok) {
-        throw new Error(data.error ?? `Request failed (${resp.status})`);
+        throw new Error(await readApiError(resp));
       }
+      const data = await resp.json();
       queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
       toast({
         title: data.cached ? "Returned cached EDGAR analysis" : "SEC filing analyzed!",

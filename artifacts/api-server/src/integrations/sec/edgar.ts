@@ -9,6 +9,7 @@ const TICKERS_URL = "https://www.sec.gov/files/company_tickers.json";
 
 const MIN_REQUEST_GAP_MS = 120;
 const MAX_FILING_CHARS = 120_000;
+const MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024;
 
 let lastRequestAt = 0;
 let tickersCache: Map<string, { cik: string; title: string }> | null = null;
@@ -50,6 +51,11 @@ async function secFetch(url: string): Promise<Response> {
       Accept: "application/json, text/html, text/plain, */*",
     },
   });
+  if (resp.status === 403) {
+    throw new Error(
+      "SEC EDGAR blocked this request (403). Set SEC_CONTACT_EMAIL in Vercel env vars to a real email address.",
+    );
+  }
   if (!resp.ok) {
     throw new Error(`SEC request failed ${resp.status}: ${url}`);
   }
@@ -186,10 +192,31 @@ export function truncateForAnalysis(text: string): string {
 
 export async function fetchFilingText(filing: EdgarFiling): Promise<string> {
   const resp = await secFetch(filing.documentUrl);
-  const raw = await resp.text();
-  const text = raw.includes("<html") || raw.includes("<HTML")
-    ? htmlToText(raw)
-    : raw;
+  const reader = resp.body?.getReader();
+  if (!reader) {
+    const raw = await resp.text();
+    const text =
+      raw.includes("<html") || raw.includes("<HTML") ? htmlToText(raw) : raw;
+    return truncateForAnalysis(text);
+  }
+
+  const decoder = new TextDecoder();
+  let raw = "";
+  let bytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_DOWNLOAD_BYTES) {
+      reader.cancel();
+      break;
+    }
+    raw += decoder.decode(value, { stream: true });
+  }
+  raw += decoder.decode();
+
+  const text =
+    raw.includes("<html") || raw.includes("<HTML") ? htmlToText(raw) : raw;
   return truncateForAnalysis(text);
 }
 

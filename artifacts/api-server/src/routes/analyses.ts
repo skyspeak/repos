@@ -11,6 +11,7 @@ import {
 import { runAnalysis } from "../analyzer/run";
 import type { ChecklistItem } from "../analyzer/types";
 import { startOfRefreshDay } from "../lib/refresh";
+import { logger } from "../lib/logger";
 import {
   fetchLatestFiling,
   mapFormToDocumentType,
@@ -152,8 +153,10 @@ router.post("/analyses/from-edgar", async (req, res): Promise<void> => {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "EDGAR analysis failed";
-    req.log.error({ err, ticker }, "Failed to analyze from EDGAR");
-    res.status(400).json({ error: message });
+    logger.error({ err, ticker }, "Failed to analyze from EDGAR");
+    if (!res.headersSent) {
+      res.status(400).json({ error: message });
+    }
   }
 });
 
